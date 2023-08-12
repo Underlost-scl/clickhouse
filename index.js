@@ -30,29 +30,34 @@ const SEPARATORS = {
 };
 
 const ALIASES = {
-	TabSeparated: "TSV"
+	TabSeparated: "TSVN",
+	TabSeparated: "TSV",
+	CSV: "CSV",
+	CSVN: 'CSVWithNames'
 };
+
+function tsve(value){
+	return value.replace(/\\/g, '\\\\').replace(/\'/g, '\\\'').replace(/\t/g, '\\t').replace(/\n/g, '\\n');
+}
+function csve(value){
+	return value.replace (/\"/g, '""');
+}
 
 var ESCAPE_STRING = {
 	/**
 	 * @return {string}
 	 */
-	TSV: function (value) {
-		return value
-			.replace(/\\/g, '\\\\')
-			.replace(/\'/g, '\\\'')
-			.replace(/\t/g, '\\t')
-			.replace(/\n/g, '\\n');
-	},
-	
-	CSV: function (value) {
-		return value.replace (/\"/g, '""');
-	},
+	TSV: (value) => {return tsve(value)},
+	TSVN: (value) => {return tsve(value)},
+	CSV: (value) => {return csve(value)},
+	CSVN: (value) => {return csve(value)},
 };
 
 var ESCAPE_NULL = {
 	TSV: "\\N",
+	TSVN: "\\N",
 	CSV: "\\N",
+	CSVN: "\\N",
 	Values: "\\N",
 	JSONEachRow: "\\N",
 };
@@ -68,13 +73,17 @@ const DATABASE = 'default';
 const FORMAT_NAMES = {
 	JSON: 'json',
 	TSV: 'tsv',
-	CSV: 'csv'
+	TSVN: 'tsvn',
+	CSV: 'csv',
+	CSVN: 'csvn'
 }
 
 const FORMATS = {
 	[FORMAT_NAMES.JSON]: 'JSON',
-	[FORMAT_NAMES.TSV]: 'TabSeparatedWithNames',
-	[FORMAT_NAMES.CSV]: 'CSVWithNames',
+	[FORMAT_NAMES.TSV]: 'TabSeparated',
+	[FORMAT_NAMES.TSVN]: 'TabSeparatedWithNames',
+	[FORMAT_NAMES.CSV]: 'CSV',
+	[FORMAT_NAMES.CSVN]: 'CSVWithNames',
 };
 
 const REVERSE_FORMATS = Object.keys(FORMATS).reduce(
@@ -359,10 +368,11 @@ class QueryCursor {
 		this.query = query;
 		this.data = data;
 		
-		this.opts = _.merge({}, opts,  {
+		this.opts = _.merge({}, {
 			format: this.connection.opts.format,
-			raw: this.connection.opts.raw
-		});
+			raw: this.connection.opts.raw,
+			debug: this.connection.opts.debug
+		}, opts);
 		
 		// Sometime needs to override format by query
 		const formatFromQuery = ClickHouse.getFormatFromQuery(this.query);
@@ -384,7 +394,7 @@ class QueryCursor {
 	}
 	
 	get isDebug() {
-		return this.connection.opts.debug;
+		return this.opts.debug;
 	}
 	
 	get format() {
@@ -648,11 +658,11 @@ class QueryCursor {
 			return JSON.parse;
 		}
 		
-		if (this.format === FORMAT_NAMES.TSV) {
+		if (this.format === FORMAT_NAMES.TSV || this.format === FORMAT_NAMES.TSVN) {
 			return parseTSV;
 		}
 		
-		if (this.format === FORMAT_NAMES.CSV) {
+		if (this.format === FORMAT_NAMES.CSV || this.format === FORMAT_NAMES.CSVN) {
 			return parseCSV;
 		}
 		
@@ -664,11 +674,11 @@ class QueryCursor {
 			return parseJSONStream;
 		}
 		
-		if (this.format === FORMAT_NAMES.TSV) {
+		if (this.format === FORMAT_NAMES.TSV || this.format === FORMAT_NAMES.TSVN) {
 			return parseTSVStream;
 		}
 		
-		if (this.format === FORMAT_NAMES.CSV) {
+		if (this.format === FORMAT_NAMES.CSV || this.format === FORMAT_NAMES.CSVN) {
 			return parseCSVStream;
 		}
 		
@@ -953,9 +963,9 @@ class ClickHouse {
 	}
 
 	get bodyParser() {
-		if (this.opts.format === FORMAT_NAMES.CSV) {
+		if (this.opts.format === FORMAT_NAMES.CSV || this.opts.format === FORMAT_NAMES.CSVN) {
 			return parseCSV;
-		} else if (this.opts.format === FORMAT_NAMES.TSV) {
+		} else if (this.opts.format === FORMAT_NAMES.TSV || this.opts.format === FORMAT_NAMES.TSVN) {
 			return parseTSV;
 		} else {
 			return JSON.parse;
